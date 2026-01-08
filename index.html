@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Case-Sensitive + Exportar</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 30px auto; padding: 20px; background-color: #f0f2f5; }
+        textarea { width: 100%; height: 120px; padding: 15px; border: 2px solid #ccc; border-radius: 8px; font-size: 16px; margin-bottom: 10px; box-sizing: border-box; }
+        
+        .toolbar { margin-bottom: 20px; display: flex; gap: 10px; }
+        button { 
+            padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; 
+            font-weight: bold; transition: background 0.3s; 
+        }
+        .btn-export { background-color: #27ae60; color: white; }
+        .btn-export:hover { background-color: #219150; }
+        .btn-clear { background-color: #e74c3c; color: white; }
+        .btn-clear:hover { background-color: #c0392b; }
+
+        h3 { color: #444; border-left: 5px solid #2ecc71; padding-left: 10px; margin-top: 30px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px; }
+        
+        .card { 
+            background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px;
+            text-align: center; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .char-main { font-size: 1.4em; font-weight: bold; color: #ddd; display: block; }
+        .details { font-size: 0.75em; color: #999; line-height: 1.2; margin-top: 5px; visibility: hidden; }
+        
+        .presente { border-color: #2ecc71; background: #fff; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .presente .char-main { color: #27ae60; }
+        .presente .details { visibility: visible; color: #666; }
+        
+        .m-count { color: #e67e22; }
+        .l-count { color: #3498db; }
+    </style>
+</head>
+<body>
+
+    <h2>Analisador Detalhado de Caracteres</h2>
+    <textarea id="entrada" placeholder="Digite seu texto aqui para contar a aparição de caracteres..."></textarea>
+
+    <div class="toolbar">
+        <button class="btn-export" onclick="exportarCSV()">Exportar para Tabela (CSV)</button>
+        <button class="btn-clear" onclick="limparTudo()">Limpar Texto</button>
+    </div>
+
+    <h3>Alfabeto Base</h3>
+    <div class="grid" id="gridAlfabeto"></div>
+
+    <h3>Números</h3>
+    <div class="grid" id="gridNumeros"></div>
+
+    <h3>Acentuadas e Especiais</h3>
+    <div class="grid" id="gridExtras"></div>
+
+    <script>
+        const alfabeto = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+        const numeros = "0123456789".split("");
+        let mapaGlobal = {}; // Armazena os dados atuais para exportação
+        
+        const grids = {
+            alfabeto: document.getElementById('gridAlfabeto'),
+            numeros: document.getElementById('gridNumeros'),
+            extras: document.getElementById('gridExtras')
+        };
+
+        function inicializar() {
+            alfabeto.forEach(l => criarCard(l, grids.alfabeto, `card-${l}`));
+            numeros.forEach(n => criarCard(n, grids.numeros, `card-${n}`));
+        }
+
+        function criarCard(char, container, id) {
+            const div = document.createElement('div');
+            div.className = 'card';
+            if(id) div.id = id;
+            div.innerHTML = `
+                <span class="char-main">${char}</span>
+                <div class="details">
+                    Total: <span class="t-val">0</span><br>
+                    <span class="m-count">M: <span class="m-val">0</span></span> | 
+                    <span class="l-count">m: <span class="l-val">0</span></span>
+                </div>`;
+            container.appendChild(div);
+        }
+
+        function atualizar() {
+            const texto = document.getElementById('entrada').value;
+            mapaGlobal = {};
+
+            for (let char of texto) {
+                if (char === " " || char === "\n") continue;
+                let base = char.toUpperCase();
+                if (!mapaGlobal[base]) mapaGlobal[base] = { char: base, total: 0, maiusc: 0, minusc: 0 };
+
+                mapaGlobal[base].total++;
+                if (char === char.toUpperCase() && char !== char.toLowerCase()) {
+                    mapaGlobal[base].maiusc++;
+                } else if (char === char.toLowerCase() && char !== char.toUpperCase()) {
+                    mapaGlobal[base].minusc++;
+                } else {
+                    mapaGlobal[base].maiusc = 0;
+                    mapaGlobal[base].minusc = 0;
+                }
+            }
+
+            // Atualizar Grids Fixos
+            [...alfabeto, ...numeros].forEach(item => {
+                const card = document.getElementById(`card-${item}`);
+                atualizarDOMCard(card, mapaGlobal[item]);
+            });
+
+            // Atualizar Extras
+            grids.extras.innerHTML = '';
+            Object.keys(mapaGlobal).forEach(char => {
+                if (!alfabeto.includes(char) && !numeros.includes(char)) {
+                    criarCard(char, grids.extras, null);
+                    atualizarDOMCard(grids.extras.lastChild, mapaGlobal[char]);
+                }
+            });
+        }
+
+        function atualizarDOMCard(card, dados) {
+            if (dados && dados.total > 0) {
+                card.classList.add('presente');
+                card.querySelector('.t-val').textContent = dados.total;
+                card.querySelector('.m-val').textContent = dados.maiusc === 0 && dados.minusc === 0 ? "-" : dados.maiusc;
+                card.querySelector('.l-val').textContent = dados.maiusc === 0 && dados.minusc === 0 ? "-" : dados.minusc;
+            } else {
+                card.classList.remove('presente');
+            }
+        }
+
+        function limparTudo() {
+            document.getElementById('entrada').value = '';
+            atualizar();
+        }
+
+        function exportarCSV() {
+            if (Object.keys(mapaGlobal).length === 0) {
+                alert("Não há dados para exportar. Digite algum texto primeiro.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Caractere,Total,Maiusculas,Minusculas\r\n";
+
+            // Ordena as chaves para o CSV ficar organizado (A-Z, depois números, depois extras)
+            const chavesOrdenadas = Object.keys(mapaGlobal).sort();
+
+            chavesOrdenadas.forEach(key => {
+                const d = mapaGlobal[key];
+                const m = d.maiusc === 0 && d.minusc === 0 ? 0 : d.maiusc;
+                const min = d.maiusc === 0 && d.minusc === 0 ? 0 : d.minusc;
+                csvContent += `${d.char},${d.total},${m},${min}\r\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "analise_texto.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        inicializar();
+        document.getElementById('entrada').addEventListener('input', atualizar);
+    </script>
+</body>
+</html>
